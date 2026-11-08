@@ -95,7 +95,7 @@ export function createServer() {
         );
       });
       for (const u of r.unreachable) out.push(`Not readable by this tool: ${u.name} — ${u.url} (${u.reason}). If it's the main wiki, point the user to it.`);
-      if (r.pcgamingwiki) out.push(`PCGamingWiki (PC settings, fixes, performance): https://www.pcgamingwiki.com/wiki/${encodeURIComponent(r.pcgamingwiki)} (link for the user; its robots.txt disallows API access).`);
+      if (r.pcgamingwiki) out.push(`PCGamingWiki (PC settings, fixes, performance): https://www.pcgamingwiki.com/wiki/${encodeURIComponent(r.pcgamingwiki)} — pass wiki="pcgamingwiki.com" to search it.`);
       const facts = r.game ? factsFor(r.game.label).concat(factsFor(game)) : factsFor(game);
       if (facts.length) out.push(`Verified facts exist for this game: call get_verified_facts.`);
       return text(out.join("\n"));

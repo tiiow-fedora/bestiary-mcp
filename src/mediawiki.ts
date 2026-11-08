@@ -59,7 +59,7 @@ export async function probeSite(api: string, ttl = 3600): Promise<WikiSite | nul
     name: g.sitename,
     articleUrl: server + articlePath,
     license: j.query.rightsinfo?.text || "see wiki",
-    licenseUrl: j.query.rightsinfo?.url || "",
+    licenseUrl: (j.query.rightsinfo?.url || "").replace(/^\/\//, "https://"),
     articles: j.query.statistics?.articles ?? 0,
     host: hostKind(api),
   };
