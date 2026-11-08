@@ -35,11 +35,16 @@ export function probeStatus(api: string) {
 
 export async function probeSite(api: string, ttl = 3600): Promise<WikiSite | null> {
   const url = apiUrl(api, { action: "query", meta: "siteinfo", siprop: "general|rightsinfo|statistics" });
-  const r = await httpGet(url, ttl, 6000);
+  let r = await httpGet(url, ttl, 6000);
+  // Some wikis fail the statistics part (e.g. database read-only during maintenance); retry without it.
+  if (r.status === 200 && /"error"/.test(r.body.slice(0, 200)) && !/"general"/.test(r.body)) {
+    r = await httpGet(apiUrl(api, { action: "query", meta: "siteinfo", siprop: "general|rightsinfo" }), ttl, 6000);
+  }
   // Bot walls (Cloudflare "Just a moment", Anubis proof-of-work) can answer 200 with a challenge page.
   // We never try to pass them; record them as a refusal so the wiki is reported, not read.
   const challenged = /^\s*</.test(r.body) && /just a moment|not a bot|within\.website|cf-chl|challenge-platform/i.test(r.body.slice(0, 4000));
-  lastProbe.set(api, challenged ? 403 : r.status);
+  // A challenge served with 429 is a rate limit (temporary), not a standing block.
+  lastProbe.set(api, challenged && r.status !== 429 ? 403 : r.status);
   if (challenged) return null;
   if (lastProbe.size > 2000) lastProbe.delete(lastProbe.keys().next().value as string);
   if (r.status !== 200) return null;

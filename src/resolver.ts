@@ -46,8 +46,9 @@ export function norm(s: string) {
   return s.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim();
 }
 const STOP = new Set(["the", "wiki", "wikis", "fandom", "of", "a", "and", "game", "official", "community", "gg", "pedia"]);
+const ROMAN: Record<string, string> = { i: "1", ii: "2", iii: "3", iv: "4", v: "5", vi: "6", vii: "7", viii: "8", ix: "9", x: "10", xi: "11", xii: "12", xiii: "13", xiv: "14", xv: "15", xvi: "16" };
 function tokens(s: string) {
-  return norm(s).split(" ").filter((t) => t && !STOP.has(t));
+  return norm(s).split(" ").filter((t) => t && !STOP.has(t)).map((t) => ROMAN[t] ?? t);
 }
 /** fraction of a's words that appear in b */
 export function nameMatch(a: string, b: string) {
@@ -166,10 +167,38 @@ function fandomApi(id: string, lang: string): string | null {
 }
 
 function slugs(name: string) {
-  const words = norm(name).split(" ").filter(Boolean);
-  const out = new Set<string>([words.join(""), words.join("-")]);
-  out.add(words.filter((w) => w !== "the").join(""));
+  const out = new Set<string>();
+  // Full name, plus the part before a subtitle ("Hollow Knight: Silksong" -> "hollowknight") and without
+  // publisher prefixes ("Tom Clancy's Rainbow Six Siege" -> "rainbowsixsiege").
+  const afterColon = name.split(/\s*:\s*/)[1];
+  const variants = [...(afterColon ? [afterColon] : []), name, name.split(/\s*[:–—]\s*|\s+-\s+/)[0], name.replace(/^(tom clancy'?s|sid meier'?s|marvel'?s|disney'?s|warhammer 40,?000:?)\s+/i, "")];
+  for (const v of variants) {
+    const words = norm(v).split(" ").filter(Boolean);
+    out.add(words.join(""));
+    out.add(words.join("-"));
+    out.add(words.filter((w) => w !== "the").join(""));
+    const digits = words.map((w) => ROMAN[w] ?? w);
+    out.add(digits.join(""));
+    out.add(digits.join("-"));
+  }
   return [...out].filter((s) => s.length >= 3 && s.length <= 60);
+}
+
+/** Fandom's own wiki search (the one fandom.com uses). Returns API URLs of wikis whose name fits. */
+async function fandomSearch(name: string, lang: string): Promise<string[]> {
+  const j = await getJson(`https://services.fandom.com/unified-search/community-search?${qs({ query: name, lang, limit: 6 })}`, 86_400);
+  const out: string[] = [];
+  for (const r of j?.results ?? []) {
+    if (typeof r?.url !== "string" || r.language !== lang) continue;
+    try {
+      const u = new URL(r.url);
+      if (!u.host.endsWith(".fandom.com")) continue;
+      out.push(`${u.origin}${u.pathname.replace(/\/$/, "")}/api.php`);
+    } catch {
+      /* skip */
+    }
+  }
+  return out;
 }
 
 function officialSiteApis(url: string): string[] {
@@ -199,8 +228,9 @@ export async function resolveGame(query: string, lang = "en", steamAppId?: numbe
       const url = new URL(list[0]).origin;
       if (label && statuses.includes(-1)) unreachable.set(url, { name: label, url, reason: "its robots.txt disallows automated API access, so it is not read" });
       else {
-        const refused = statuses.find((st) => st === 403 || st === 429 || st === 503);
-        if (label && refused) unreachable.set(url, { name: label, url, reason: `blocks automated access (HTTP ${refused})` });
+        const refused = statuses.find((st) => st === 403 || st === 503);
+        if (label && statuses.includes(429)) unreachable.set(url, { name: label, url, reason: "is rate-limiting requests right now (HTTP 429); try again in a minute" });
+        else if (label && refused) unreachable.set(url, { name: label, url, reason: `blocks automated access (HTTP ${refused})` });
       }
       return null;
     }
@@ -232,16 +262,20 @@ export async function resolveGame(query: string, lang = "en", steamAppId?: numbe
   // 1. The game's own Wikidata links
   for (const id of wd.claims.P4073 ?? []) {
     const api = fandomApi(id, lang);
-    if (api) jobs.push(add(api, "wikidata", "high", { franchise: false }));
+    // Wikidata sometimes links a game to a mod/fan wiki ("Half-Life Forever"); those get less trust.
+    if (api) jobs.push(probeSite(api).then((site) => (site ? add(api, "wikidata", fits(site.name) ? "high" : "medium", { franchise: false }) : null)));
   }
   // P6262 also links crossover wikis (Brickipedia, VS Battles), so the wiki's name must match the game or its series.
-  const seriesNames = [gameName, ...wd.parents.map((p) => p.label)];
+  const seriesNames = [query, gameName, ...wd.parents.map((p) => p.label)];
+  // Strict fit for weakly-linked sources: every word of the wiki's name must come from the game or series name.
+  // "Rainbow Six Wiki" fits "Tom Clancy's Rainbow Six"; "Half-Life Forever Wiki" doesn't fit "Half-Life".
+  const fits = (siteName: string) => seriesNames.some((n) => nameMatch(siteName, n) === 1);
   const p6262 = (wd.claims.P6262 ?? []).map(async (v) => {
     const [wiki, ...rest] = v.split(":");
     const api = fandomApi(wiki, lang);
     if (!api || AGGREGATOR_WIKIS.has(wiki.replace(/^[a-z]{2}\./, ""))) return;
     const site = await probeSite(api);
-    if (!site || !seriesNames.some((n) => nameMatch(site.name, n) >= 0.5 || nameMatch(n, site.name) >= 0.5)) return;
+    if (!site || !fits(site.name)) return;
     // A franchise wiki's page for the game (Fallout Wiki -> "Fallout 4") is useful but series-wide.
     await add(api, "wikidata article", "high", { pageHint: rest.join(":").replace(/_/g, " "), franchise: nameMatch(gameName, site.name) < 1 || undefined });
   });
@@ -255,33 +289,32 @@ export async function resolveGame(query: string, lang = "en", steamAppId?: numbe
       if (!api) continue;
       jobs.push(
         probeSite(api).then((site) =>
-          site && nameMatch(p.label, site.name) >= 0.5 ? add(api, `series: ${p.label}`, "medium", { franchise: true, notes: [`Covers the whole ${p.label} series`] }) : null,
+          site && fits(site.name) ? add(api, `series: ${p.label}`, "medium", { franchise: true, notes: [`Covers the whole ${p.label} series`] }) : null,
         ),
       );
     }
   }
 
-  // 3. Slug probes on the big hosts (query, canonical label, series names)
+  // Phase 1 (always): Wikidata links above, one cheap wiki.gg guess, then Indie Wiki Buddy.
   const names = [...new Set([query, gameName, ...wd.parents.map((p) => p.label)])];
-  const probeApis = new Set<string>();
-  for (const n of names)
-    for (const sl of slugs(n)) {
-      probeApis.add(`https://${sl}.wiki.gg/api.php`);
-      probeApis.add(`https://${sl}.fandom.com/api.php`);
-    }
-  for (const a of probeApis) jobs.push(add(a, "slug probe", "low"));
+  for (const n of new Set([query, gameName])) {
+    const sl = slugs(n)[0];
+    if (sl) jobs.push(add(`https://${sl}.wiki.gg/api.php`, "slug probe", "low"));
+  }
   await Promise.all(jobs);
 
-  // 4. Indie Wiki Buddy: Fandom -> new home, and direct name matches
+  // Indie Wiki Buddy: Fandom -> new home, and direct name matches
   const local = sites.filter((s) => s.language === lang.toUpperCase());
   const fandomKey = (c: Candidate) => c.articleUrl.replace(/^https?:\/\//, "").replace(/\/wiki\/\$1$/, "");
-  const iwbJobs = local.map(async (s) => {
+  const iwbDone = new Set<IwbSite>();
+  const runIwb = () => Promise.all(local.map(async (s) => {
     const label = s.origins_label.replace(IWB_NOISE, " ").trim();
     const nameHit = [gameName, ...wd.parents.map((p) => p.label)].some(
       (n) => Math.max(nameMatch(n, label), nameMatch(n, s.destination)) === 1 && Math.max(nameMatch(label, n), nameMatch(s.destination, n)) >= 0.75,
     );
     const fandoms = [...cands.values()].filter((c) => c.host === "fandom" && s.origins.some((o) => o.origin_base_url.replace(/\/$/, "") === fandomKey(c)));
-    if (!nameHit && fandoms.length === 0) return;
+    if ((!nameHit && fandoms.length === 0) || iwbDone.has(s)) return;
+    iwbDone.add(s);
     const isFranchise = fandoms.length > 0 && fandoms.every((f) => f.franchise);
     const c = await add(iwbApis(s), "indie-wiki-buddy", fandoms.length ? (isFranchise ? "medium" : "high") : "medium", {
       official: s.tags?.includes("official"),
@@ -297,8 +330,36 @@ export async function resolveGame(query: string, lang = "en", steamAppId?: numbe
       const where = c ? `${c.name} (${new URL(c.api).host})` : `${s.destination} (${s.destination_base_url})`;
       f.notes.push(`Editors moved to ${where}; this Fandom copy may be out of date`);
     }
-  });
-  await Promise.all(iwbJobs);
+  }));
+  await runIwb();
+
+  // Phase 2 (only when phase 1 found nothing solid): guess more addresses and ask Fandom's wiki search.
+  // Kept behind the check because it costs ~10-20 requests per game, and wiki hosts rate-limit.
+  const solid = [...cands.values()].some((c) => rank(c.confidence) >= 2 && (!c.superseded || c.newHomeUnreadable) && c.articles >= 50 && fits(c.name));
+  if (!solid) {
+    const more: Promise<unknown>[] = [];
+    const probeApis = new Set<string>();
+    for (const n of names)
+      for (const sl of slugs(n)) {
+        probeApis.add(`https://${sl}.wiki.gg/api.php`);
+        probeApis.add(`https://${sl}.fandom.com/api.php`);
+      }
+    for (const a of probeApis) more.push(add(a, "slug probe", "low"));
+    // Fandom's wiki search catches wikis whose address doesn't follow the game's name (rainbowsix for Siege).
+    for (const n of [...new Set([gameName, ...wd.parents.map((p) => p.label)])].slice(0, 3))
+      more.push(
+        fandomSearch(n, lang).then((apis) =>
+          Promise.all(apis.map(async (a) => {
+            const site = await probeSite(a);
+            return site && fits(site.name) ? add(a, "fandom search", "medium") : null;
+          })),
+        ),
+      );
+    await Promise.all(more);
+    await runIwb();
+  }
+
+
 
   // Name sanity check for weak sources; drop clear mismatches and fan-fiction wikis.
   const fanQuery = /fanon|fan ?fic|creepypasta|roleplay|ideas/i.test(query);
@@ -319,6 +380,10 @@ export async function resolveGame(query: string, lang = "en", steamAppId?: numbe
     // however it was found.
     if (c.franchise === undefined && nameMatch(gameName, c.name) < 1 && wd.parents.some((p) => nameMatch(c.name, p.label) === 1)) c.franchise = true;
     let s = rank(c.confidence) * 10;
+    // Extra words in the wiki's name beyond the game/series ("Half-Life Forever", "Half-Life Machinima")
+    // usually mean a mod, fan project or spin-off wiki.
+    const fit = Math.max(...names.map((n) => nameMatch(c.name, n)));
+    s -= (1 - fit) * 14;
     if (c.official) s += 8;
     if (c.host !== "fandom") s += 3; // editors usually leave Fandom, not the other way round
     if (c.superseded) s -= c.newHomeUnreadable ? 4 : 25; // if the new home blocks us, the old copy is the best we can read

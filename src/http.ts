@@ -5,12 +5,25 @@ export const USER_AGENT =
   "Bestiary-bot/0.1 (MCP server for game wiki lookups; https://github.com/tiiow-fedora/bestiary-mcp)";
 
 const TIMEOUT_MS = 12_000;
-const MIN_HOST_GAP_MS = 150;
-const CACHE_MAX = 500;
+const MIN_HOST_GAP_MS = 250; // per hosting platform, not per wiki: all *.fandom.com wikis share one budget
+const DEFAULT_COOLDOWN_MS = 60_000;
+const CACHE_MAX = 800;
 
 type Entry = { at: number; ttl: number; status: number; body: string; headers: Record<string, string> };
 const cache = new Map<string, Entry>();
 const lastHit = new Map<string, number>();
+const coolUntil = new Map<string, number>();
+let requestCount = 0;
+/** Number of real (uncached) HTTP requests made so far; used by tests to measure cost per lookup. */
+export function requestsMade() {
+  return requestCount;
+}
+
+/** Rate-limit key: the hosting platform. terraria.wiki.gg and dota2.wiki.gg share "wiki.gg". */
+export function platformKey(host: string) {
+  const parts = host.toLowerCase().split(".");
+  return parts.length <= 2 ? parts.join(".") : parts.slice(-2).join(".");
+}
 
 export interface HttpResult {
   status: number;
@@ -33,8 +46,11 @@ export async function httpGet(url: string, ttlSeconds = 600, timeoutMs = TIMEOUT
     cache.set(url, hit);
     return { status: hit.status, body: hit.body, headers: hit.headers };
   }
-  const host = new URL(url).host;
-  await spaceHost(host);
+  const key = platformKey(new URL(url).host);
+  // While a platform is rate-limiting us, don't send it anything: answer locally with the 429.
+  if ((coolUntil.get(key) ?? 0) > Date.now()) return { status: 429, body: "cooling down after a rate limit", headers: {} };
+  await spaceHost(key);
+  requestCount++;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   let res: Response;
@@ -52,6 +68,10 @@ export async function httpGet(url: string, ttlSeconds = 600, timeoutMs = TIMEOUT
   const body = await res.text();
   const headers: Record<string, string> = {};
   res.headers.forEach((v, k) => (headers[k] = v));
+  if (res.status === 429 || (res.status === 503 && headers["retry-after"])) {
+    const ra = Number(headers["retry-after"]);
+    coolUntil.set(key, Date.now() + (Number.isFinite(ra) && ra > 0 ? Math.min(ra, 900) * 1000 : DEFAULT_COOLDOWN_MS));
+  }
   // Cache successes and definite "no such wiki" answers; not transient errors.
   if (ttlSeconds > 0 && (res.status === 200 || res.status === 404 || res.status === 401 || res.status === 410)) {
     cache.set(url, { at: Date.now(), ttl: ttlSeconds, status: res.status, body, headers });
