@@ -9,8 +9,8 @@
 // - allowedByRobots() is the full RFC check. Anything that bulk-fetches (dumps, indexing, pre-caching) must use it.
 import { httpGet } from "./http.js";
 
-export const PRODUCT_TOKEN = "gamewikiscout-bot";
-const AI_USER_AGENTS = ["claude-user", "chatgpt-user", "perplexity-user", "mistralai-user", "gamewikiscout", PRODUCT_TOKEN];
+export const PRODUCT_TOKEN = "bestiary-bot";
+const AI_USER_AGENTS = ["claude-user", "chatgpt-user", "perplexity-user", "mistralai-user", "bestiary", PRODUCT_TOKEN];
 
 interface Rule { allow: boolean; path: string }
 interface Group { agents: string[]; rules: Rule[] }

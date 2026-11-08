@@ -2,7 +2,7 @@
 // Never send a browser User-Agent: wiki.gg answers those with 403.
 
 export const USER_AGENT =
-  "GameWikiScout-bot/0.1 (MCP server for game wiki lookups; https://github.com/tiiow-fedora/game-wiki-scout)";
+  "Bestiary-bot/0.1 (MCP server for game wiki lookups; https://github.com/tiiow-fedora/bestiary-mcp)";
 
 const TIMEOUT_MS = 12_000;
 const MIN_HOST_GAP_MS = 150;

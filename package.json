@@ -1,9 +1,9 @@
 {
-  "name": "game-wiki-scout",
+  "name": "bestiary-mcp",
   "version": "0.1.0",
   "description": "MCP server that finds the right wiki for any video game and reads it, so AI models stop guessing game facts.",
   "type": "module",
-  "bin": { "game-wiki-scout": "dist/stdio.js" },
+  "bin": { "bestiary-mcp": "dist/stdio.js" },
   "main": "dist/stdio.js",
   "files": ["dist", "facts", "README.md", "LICENSE"],
   "scripts": {

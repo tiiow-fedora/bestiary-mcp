@@ -7,7 +7,7 @@
 //   3. Indie Wiki Buddy data (MIT): Fandom wiki -> where its community moved (wiki.gg / independent)
 //   4. Probing {slug}.wiki.gg and {slug}.fandom.com, checked against the wiki's own name
 // Wikis that block automated access or opt out of AI agents in robots.txt are listed, never read.
-import { getJson, qs } from "./http.js";
+import { getJson, qs, USER_AGENT } from "./http.js";
 import { aiOptOut } from "./robots.js";
 import { lastActivity, probeSite, probeStatus, WikiSite } from "./mediawiki.js";
 
@@ -113,9 +113,22 @@ async function wdEntities(ids: string[], props = "claims|labels") {
   return (e?.entities ?? {}) as Record<string, any>;
 }
 
-async function wikidata(game: string, lang: string) {
+/** Exact Wikidata item for a Steam app ID (P1733), the most reliable key for niche games. */
+async function wdBySteamId(appId: number, lang: string): Promise<WdHit | undefined> {
+  const s = await getJson(`https://www.wikidata.org/w/api.php?${qs({ action: "query", list: "search", srsearch: `haswbstatement:P1733=${appId}`, srlimit: 1, format: "json" })}`, 86_400);
+  const id: string | undefined = s?.query?.search?.[0]?.title;
+  if (!id) return undefined;
+  const e = await getJson(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: id, props: "labels|descriptions", languages: `${lang}|en|mul`, format: "json" })}`, 86_400);
+  const ent = e?.entities?.[id];
+  const pick = (o: any) => o?.[lang]?.value ?? o?.en?.value ?? o?.mul?.value;
+  return { id, label: pick(ent?.labels) ?? "", description: pick(ent?.descriptions) };
+}
+
+async function wikidata(game: string, lang: string, steamAppId?: number) {
   const s = await getJson(`https://www.wikidata.org/w/api.php?${qs({ action: "wbsearchentities", search: game, language: lang, uselang: lang, type: "item", limit: 8, format: "json" })}`, 86_400);
-  const hits: WdHit[] = (s?.search ?? []).map((h: any) => ({ id: h.id, label: h.label, description: h.description }));
+  let hits: WdHit[] = (s?.search ?? []).map((h: any) => ({ id: h.id, label: h.label, description: h.description }));
+  const steamHit = steamAppId ? await wdBySteamId(steamAppId, lang) : undefined;
+  if (steamHit) hits = [steamHit, ...hits.filter((h) => h.id !== steamHit.id)];
   const empty = { best: undefined as WdHit | undefined, others: [] as WdHit[], claims: {} as Claims, parents: [] as { label: string; claims: Claims }[] };
   if (hits.length === 0) return empty;
   const ents = await wdEntities(hits.map((h) => h.id), "claims");
@@ -128,10 +141,11 @@ async function wikidata(game: string, lang: string) {
     if (/\b(series|franchise|universe|character|soundtrack|film|novel|album)\b/i.test(h.description ?? "")) score -= 3;
     score += nameMatch(game, h.label) * 2;
     if (norm(h.label) === norm(game)) score += 8;
+    if (steamHit && h.id === steamHit.id) score += 50; // exact Steam app match beats any name match
     return { h, c, score };
   });
   scored.sort((a, b) => b.score - a.score);
-  const gameish = scored.filter((x) => x.c.P4073.length || x.c.P6262.length || x.c.P6337.length || x.c.P1733.length || GAMEISH.test(x.h.description ?? ""));
+  const gameish = scored.filter((x) => (steamHit && x.h.id === steamHit.id) || x.c.P4073.length || x.c.P6262.length || x.c.P6337.length || x.c.P1733.length || GAMEISH.test(x.h.description ?? ""));
   const best = gameish[0];
   if (!best) return { ...empty, others: [] };
   // One hop up: series and franchise.
@@ -171,7 +185,7 @@ function officialSiteApis(url: string): string[] {
 }
 
 // ---------- main ----------
-export async function resolveGame(query: string, lang = "en"): Promise<Resolution> {
+export async function resolveGame(query: string, lang = "en", steamAppId?: number): Promise<Resolution> {
   // Keyed by the wiki's canonical article URL so Fandom aliases (hollow-knight -> hollowknight) collapse.
   const cands = new Map<string, Candidate>();
   const unreachable = new Map<string, Unreachable>();
@@ -211,7 +225,7 @@ export async function resolveGame(query: string, lang = "en"): Promise<Resolutio
     return c;
   };
 
-  const [wd, sites] = await Promise.all([wikidata(query, lang), iwb()]);
+  const [wd, sites] = await Promise.all([wikidata(query, lang, steamAppId), iwb()]);
   const gameName = wd.best?.label ?? query;
   const jobs: Promise<unknown>[] = [];
 
@@ -321,14 +335,54 @@ export async function resolveGame(query: string, lang = "en"): Promise<Resolutio
   }
   const wikis = [...cands.values()].sort((a, b) => b.score - a.score);
 
+  // PCGamingWiki: technical info for nearly every PC game. Always listed last; it becomes the one used only
+  // when nothing else covers the game, which is common for niche indie titles.
+  let pcgwTitle: string | undefined = wd.claims.P6337?.[0]?.replace(/_/g, " ");
+  if (!pcgwTitle && steamAppId) pcgwTitle = await pcgwBySteamId(steamAppId);
+  if (!pcgwTitle && wikis.length === 0) pcgwTitle = await pcgwByName(gameName);
+  if (pcgwTitle && !wikis.some((w) => w.host === "pcgamingwiki")) {
+    const site = await probeSite(PCGAMINGWIKI_API);
+    if (site)
+      wikis.push({
+        ...site,
+        confidence: wikis.length ? "low" : "medium",
+        via: ["pcgamingwiki"],
+        notes: ["PC technical wiki: settings, fixes, performance, save locations. Not a gameplay wiki"],
+        pageHint: pcgwTitle,
+        score: -100,
+      });
+  }
+
   return {
     query,
     game: wd.best ? { label: wd.best.label, description: wd.best.description, wikidata: wd.best.id } : undefined,
     otherMatches: wd.others.map((o) => ({ label: o.label, description: o.description, wikidata: o.id })),
     wikis,
     unreachable: [...unreachable.values()],
-    pcgamingwiki: wd.claims.P6337?.[0],
+    pcgamingwiki: pcgwTitle?.replace(/ /g, "_"),
   };
+}
+
+const pcgwIdCache = new Map<number, string | undefined>();
+/** PCGamingWiki's own app-ID redirect (its Cargo query API is closed to anonymous use). */
+async function pcgwBySteamId(appId: number): Promise<string | undefined> {
+  if (pcgwIdCache.has(appId)) return pcgwIdCache.get(appId);
+  let title: string | undefined;
+  try {
+    const r = await fetch(`https://www.pcgamingwiki.com/api/appid.php?appid=${appId}`, { headers: { "User-Agent": USER_AGENT }, redirect: "manual", signal: AbortSignal.timeout(6000) });
+    const loc = r.headers.get("location") ?? "";
+    const m = loc.match(/\/wiki\/([^?#]+)/);
+    if (m) title = decodeURIComponent(m[1]).replace(/_/g, " ");
+  } catch {
+    /* network error: no PCGW link */
+  }
+  pcgwIdCache.set(appId, title);
+  return title;
+}
+async function pcgwByName(name: string): Promise<string | undefined> {
+  const o = await getJson(`${PCGAMINGWIKI_API}?${qs({ action: "opensearch", search: name, limit: 5, namespace: 0, format: "json" })}`, 86_400);
+  const titles: string[] = Array.isArray(o?.[1]) ? o[1] : [];
+  return titles.find((t) => norm(t) === norm(name));
 }
 
 function rank(c: Candidate["confidence"]) {

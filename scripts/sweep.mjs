@@ -1,6 +1,7 @@
 // Resolution sweep: node scripts/sweep.mjs  -> one line per game with the top 2 wikis.
 import { resolveGame } from "../dist/resolver.js";
-const games = process.argv.slice(2).length ? process.argv.slice(2) : [
+const cli = process.argv.slice(2).filter((a) => a !== "--json");
+const games = cli.length ? cli : [
   "Stardew Valley","The Legend of Zelda: Tears of the Kingdom","Baldur's Gate 3","Factorio","Satisfactory","Valheim","Hades","Hades II",
   "Dark Souls III","Bloodborne","Sekiro","Path of Exile 2","Warframe","Destiny 2","League of Legends","Dota 2","Team Fortress 2",
   "Counter-Strike 2","Rimworld","Oxygen Not Included","Don't Starve Together","Subnautica","No Man's Sky","Cyberpunk 2077",
@@ -9,10 +10,19 @@ const games = process.argv.slice(2).length ? process.argv.slice(2) : [
   "Celeste","Undertale","Dead Cells","Grounded","Palworld","Lethal Company","Balatro","Helldivers 2","Monster Hunter Wilds",
   "Blox Fruits","Adopt Me!","Arknights","Final Fantasy XIV","World of Warcraft","Ark: Survival Evolved","The Powder Toy","Cookie Clicker",
 ];
-for (const g of games) {
+// Entries may be "Name" or "Name|steamAppId". With --json, writes one JSON object per line.
+const asJson = process.argv.includes("--json");
+for (const entry of games.filter((g) => g !== "--json")) {
+  const [g, appid] = entry.split("|");
   const t = Date.now();
   try {
-    const r = await resolveGame(g);
+    const r = await resolveGame(g, "en", appid ? Number(appid) : undefined);
+    if (asJson) {
+      console.log(JSON.stringify({ name: g, appid, game: r.game?.label, desc: r.game?.description, ms: Date.now() - t,
+        wikis: r.wikis.slice(0, 3).map((w) => ({ host: new URL(w.api).host, kind: w.host, conf: w.confidence, articles: w.articles, sup: !!w.superseded, series: !!w.franchise, page: w.pageHint })),
+        blocked: r.unreachable.map((u) => u.url) }));
+      continue;
+    }
     const top = r.wikis.slice(0, 2).map((w) => `${new URL(w.api).host}(${w.host[0]}${w.superseded ? ",SUP" : ""},${w.confidence[0]},${w.articles})`).join("  ");
     console.log(`${g.padEnd(42)} | ${(r.game?.label ?? "-").slice(0, 28).padEnd(28)} | ${top || "NONE"}  ${Date.now() - t}ms`);
   } catch (e) { console.log(`${g} | ERROR ${e}`); }

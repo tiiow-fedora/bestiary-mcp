@@ -10,24 +10,24 @@ export const VERSION = "0.1.0";
 const DEFAULT_MAX_CHARS = 12_000;
 
 const resolutions = new Map<string, { at: number; r: Resolution }>();
-async function resolveCached(game: string, lang: string) {
-  const key = `${lang}:${norm(game)}`;
+async function resolveCached(game: string, lang: string, steamAppId?: number) {
+  const key = `${lang}:${norm(game)}:${steamAppId ?? ""}`;
   const hit = resolutions.get(key);
   if (hit && Date.now() - hit.at < 6 * 3600_000) return hit.r;
-  const r = await resolveGame(game, lang);
+  const r = await resolveGame(game, lang, steamAppId);
   resolutions.set(key, { at: Date.now(), r });
   if (resolutions.size > 300) resolutions.delete(resolutions.keys().next().value as string);
   return r;
 }
 
-async function pickSite(game?: string, wiki?: string, lang = "en"): Promise<{ site: WikiSite; note?: string } | { error: string }> {
+async function pickSite(game?: string, wiki?: string, lang = "en", steamAppId?: number): Promise<{ site: WikiSite; note?: string } | { error: string }> {
   if (wiki) {
     const s = await siteFromUrl(wiki);
     if (s && "optOut" in s) return { error: `${s.optOut} doesn't allow automated/AI access in its robots.txt, so this tool doesn't read it. Send the user there directly.` };
     return s ? { site: s } : { error: `Could not find a MediaWiki API at "${wiki}".` };
   }
   if (!game) return { error: "Give either `game` or `wiki`." };
-  const r = await resolveCached(game, lang);
+  const r = await resolveCached(game, lang, steamAppId);
   const best = r.wikis[0];
   const blocked = r.unreachable.map((u) => `${u.name} (${u.url}) ${u.reason}`).join("; ");
   if (!best) return { error: `No readable wiki found for "${game}".${blocked ? ` Known but not readable: ${blocked}.` : ""} Try find_game_wiki with another spelling, or pass a wiki URL.` };
@@ -35,6 +35,7 @@ async function pickSite(game?: string, wiki?: string, lang = "en"): Promise<{ si
   let note = `Using ${best.name} (${new URL(best.api).host}) for "${r.game?.label ?? game}"${alt ? `; others: ${alt}` : ""}.`;
   if (best.franchise) note += ` This is a series-wide wiki; make sure pages are about ${r.game?.label ?? game}.`;
   if (best.pageHint) note += ` The game's own page there is "${best.pageHint}".`;
+  if (best.host === "pcgamingwiki") note += " No gameplay wiki was found for this game; PCGamingWiki covers technical topics only.";
   if (blocked) note += ` Note: ${blocked}; the wiki used here may be less current, so tell the user where the main wiki is.`;
   return { site: best, note };
 }
@@ -61,7 +62,7 @@ function factsFor(game: string) {
 
 export function createServer() {
   const server = new McpServer(
-    { name: "game-wiki-scout", version: VERSION },
+    { name: "bestiary-mcp", version: VERSION },
     {
       instructions:
         "Use these tools whenever a question depends on specific video game facts (items, recipes, drop rates, stats, quests, locations, mechanics, patch changes). " +
@@ -77,11 +78,11 @@ export function createServer() {
       description:
         "Find which wikis cover a video game (Fandom, wiki.gg, independent wikis like minecraft.wiki), ranked by trust and freshness. " +
         "Flags Fandom wikis whose editors moved elsewhere, and lists other games with similar names. Use it to disambiguate or to choose a wiki; the other tools call it automatically.",
-      inputSchema: { game: z.string().min(1).describe("Game name, e.g. 'Hollow Knight', 'Lumber Tycoon 2'"), language: z.string().default("en").describe("Wiki language code") },
+      inputSchema: { game: z.string().min(1).describe("Game name, e.g. 'Hollow Knight', 'Lumber Tycoon 2'"), steam_appid: z.number().int().positive().optional().describe("Steam app ID, if known: makes niche or ambiguous names resolve exactly"), language: z.string().default("en").describe("Wiki language code") },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ game, language }) => {
-      const r = await resolveCached(game, language);
+    async ({ game, steam_appid, language }) => {
+      const r = await resolveCached(game, language, steam_appid);
       const out: string[] = [];
       if (r.game) out.push(`Game: ${r.game.label}${r.game.description ? ` — ${r.game.description}` : ""} (Wikidata ${r.game.wikidata})`);
       else out.push(`No Wikidata entry matched "${game}"; results come from probing wiki hosts only.`);
@@ -111,13 +112,14 @@ export function createServer() {
         query: z.string().min(1),
         game: z.string().optional(),
         wiki: z.string().optional().describe("Wiki domain or URL; overrides game"),
+        steam_appid: z.number().int().positive().optional().describe("Steam app ID, if known: makes niche or ambiguous names resolve exactly"),
         limit: z.number().int().min(1).max(20).default(8),
         language: z.string().default("en"),
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ query, game, wiki, limit, language }) => {
-      const p = await pickSite(game, wiki, language);
+    async ({ query, game, wiki, steam_appid, limit, language }) => {
+      const p = await pickSite(game, wiki, language, steam_appid);
       if ("error" in p) return { ...text(p.error), isError: true };
       const hits = await search(p.site, query, limit);
       const body = hits.length
@@ -139,13 +141,14 @@ export function createServer() {
         game: z.string().optional(),
         wiki: z.string().optional(),
         section: z.string().optional().describe("Section number or heading text; 'all' for the whole page"),
+        steam_appid: z.number().int().positive().optional().describe("Steam app ID, if known: makes niche or ambiguous names resolve exactly"),
         max_chars: z.number().int().min(1000).max(60_000).default(DEFAULT_MAX_CHARS),
         language: z.string().default("en"),
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ title, game, wiki, section, max_chars, language }) => {
-      const p = await pickSite(game, wiki, language);
+    async ({ title, game, wiki, section, steam_appid, max_chars, language }) => {
+      const p = await pickSite(game, wiki, language, steam_appid);
       if ("error" in p) return { ...text(p.error), isError: true };
       const site = p.site;
       const sections = await sectionList(site, title);

@@ -1,10 +1,10 @@
-# game-wiki-scout
+# Bestiary
 
 An MCP server that gives AI assistants real video game knowledge. AI models know the general feel of most
 games but guess at specifics: drop rates, recipes, boss health, which patch changed what. This server finds
 the right wiki for **any** game and reads it, so the model can cite facts instead of making them up.
 
-> Working name. Not published yet.
+> MCP server for AI assistants. Contact: open an issue at https://github.com/tiiow-fedora/bestiary-mcp
 
 ## What it does
 
@@ -46,7 +46,7 @@ OSRS → oldschool.runescape.wiki, Zelda TotK → zeldawiki.wiki, and Skyrim →
 ```bash
 npm install
 npm run build
-claude mcp add game-wiki-scout --scope user -- node /path/to/game-wiki-scout/dist/stdio.js
+claude mcp add bestiary-mcp --scope user -- node /path/to/bestiary-mcp/dist/stdio.js
 ```
 
 Any MCP client works the same way: run `node dist/stdio.js` over stdio.
