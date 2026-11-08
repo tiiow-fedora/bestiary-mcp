@@ -27,8 +27,21 @@ function apiUrl(api: string, params: Record<string, string | number | undefined>
 
 /** Load site info. Returns null when the wiki doesn't exist or isn't a MediaWiki API.
  *  wiki.gg answers 401 (realm "Unreleased site") for names that aren't live; Fandom answers 404. */
+const lastProbe = new Map<string, number>();
+/** HTTP status of the most recent probeSite(api) call (0 = network error). */
+export function probeStatus(api: string) {
+  return lastProbe.get(api);
+}
+
 export async function probeSite(api: string, ttl = 3600): Promise<WikiSite | null> {
-  const r = await httpGet(apiUrl(api, { action: "query", meta: "siteinfo", siprop: "general|rightsinfo|statistics" }), ttl);
+  const url = apiUrl(api, { action: "query", meta: "siteinfo", siprop: "general|rightsinfo|statistics" });
+  const r = await httpGet(url, ttl, 6000);
+  // Bot walls (Cloudflare "Just a moment", Anubis proof-of-work) can answer 200 with a challenge page.
+  // We never try to pass them; record them as a refusal so the wiki is reported, not read.
+  const challenged = /^\s*</.test(r.body) && /just a moment|not a bot|within\.website|cf-chl|challenge-platform/i.test(r.body.slice(0, 4000));
+  lastProbe.set(api, challenged ? 403 : r.status);
+  if (challenged) return null;
+  if (lastProbe.size > 2000) lastProbe.delete(lastProbe.keys().next().value as string);
   if (r.status !== 200) return null;
   let j: any;
   try {
@@ -105,7 +118,7 @@ export async function parsePage(site: WikiSite, title: string, section?: string)
       action: "parse",
       page: title,
       prop: "text|sections|revid",
-      section: section ?? "0",
+      section, // undefined = whole page
       redirects: 1,
       disableeditsection: 1,
       disabletoc: 1,
@@ -116,12 +129,7 @@ export async function parsePage(site: WikiSite, title: string, section?: string)
   if (!j) return { error: "wiki did not answer" };
   if (j.error) return { error: `${j.error.code}: ${j.error.info}` };
   const p = j.parse;
-  let sections: Section[] = p.sections ?? [];
-  if (section !== undefined && section !== "0") sections = [];
-  else if (sections.length === 0 || section === "0") {
-    // With section=0 MediaWiki still returns the full list; nothing else needed.
-  }
-  return { title: p.title, html: typeof p.text === "string" ? p.text : p.text?.["*"] ?? "", sections, revid: p.revid };
+  return { title: p.title, html: typeof p.text === "string" ? p.text : p.text?.["*"] ?? "", sections: p.sections ?? [], revid: p.revid };
 }
 
 export async function sectionList(site: WikiSite, title: string): Promise<Section[]> {

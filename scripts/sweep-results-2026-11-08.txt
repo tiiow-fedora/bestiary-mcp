@@ -1,0 +1,53 @@
+Stardew Valley                             | Stardew Valley               | stardewvalley.fandom.com(f,SUP,h,1110)  1752ms
+The Legend of Zelda: Tears of the Kingdom  | The Legend of Zelda: Tears o | zeldawiki.wiki(i,m,18579)  zelda.fandom.com(f,SUP,h,11981)  2295ms
+Baldur's Gate 3                            | Baldur's Gate 3              | bg3.wiki(i,m,13189)  baldursgate.fandom.com(f,m,7832)  2597ms
+Factorio                                   | Factorio                     | wiki.factorio.com(i,h,5256)  factorio.fandom.com(f,SUP,h,91)  1193ms
+Satisfactory                               | Satisfactory                 | satisfactory.wiki.gg(w,h,873)  satisfactory.fandom.com(f,SUP,m,692)  1213ms
+Valheim                                    | Valheim                      | valheim.weirdgloop.org(i,h,1283)  valheim.fandom.com(f,SUP,h,1082)  1674ms
+Hades                                      | Hades                        | hades.fandom.com(f,h,748)  hades.wiki.gg(w,m,102)  1272ms
+Hades II                                   | Hades II                     | hades.fandom.com(f,h,748)  hades.wiki.gg(w,m,102)  862ms
+Dark Souls III                             | Dark Souls III               | darksouls.fandom.com(f,m,4777)  1116ms
+Bloodborne                                 | Bloodborne                   | bloodborne.fandom.com(f,h,863)  bloodborne.wiki.gg(w,m,0)  1447ms
+Sekiro                                     | Sekiro: Shadows Die Twice    | sekiro-shadows-die-twice.fandom.com(f,m,415)  1184ms
+Path of Exile 2                            | Path of Exile 2              | www.poe2wiki.net(i,h,6148)  www.poewiki.net(i,m,17058)  2285ms
+Warframe                                   | Warframe                     | wiki.warframe.com(i,h,11662)  warframe.fandom.com(f,SUP,h,9313)  1099ms
+Destiny 2                                  | Destiny 2                    | www.destinypedia.com(i,h,11434)  destiny.fandom.com(f,SUP,m,9465)  1654ms
+League of Legends                          | League of Legends            | wiki.leagueoflegends.com(i,h,16932)  leagueoflegends.fandom.com(f,SUP,m,10847)  2027ms
+Dota 2                                     | Dota 2                       | dota2.fandom.com(f,SUP,m,22420)  dota.fandom.com(f,m,525)  2442ms
+Team Fortress 2                            | Team Fortress 2              | teamfortress.fandom.com(f,SUP,m,1233)  team-fortress.fandom.com(f,m,46)  1200ms
+Counter-Strike 2                           | Counter-Strike 2             | counterstrike.fandom.com(f,h,3211)  1302ms
+Rimworld                                   | RimWorld                     | rimworldwiki.com(i,h,2827)  rimworld.fandom.com(f,SUP,m,176)  1393ms
+Oxygen Not Included                        | Oxygen Not Included          | oxygennotincluded.wiki.gg(w,h,2199)  oxygennotincluded.fandom.com(f,SUP,m,1055)  1353ms
+Don't Starve Together                      | Don't Starve Together        | dontstarve.wiki.gg(w,h,3280)  dontstarve.fandom.com(f,SUP,h,2257)  1786ms
+Subnautica                                 | Subnautica                   | wiki.subnautica.com(i,m,788)  subnautica.fandom.com(f,SUP,m,1247)  7831ms
+No Man's Sky                               | No Man's Sky                 | nomanssky.fandom.com(f,m,95129)  1237ms
+Cyberpunk 2077                             | Cyberpunk 2077               | cyberpunk.fandom.com(f,h,13627)  1715ms
+The Witcher 3                              | The Witcher 3: Wild Hunt     | witcher.fandom.com(f,m,12358)  1391ms
+Skyrim                                     | Skyrim                       | skyrim.fandom.com(f,SUP,m,11874)  elderscrolls.fandom.com(f,SUP,m,73577)  1641ms
+Fallout 4                                  | Fallout 4                    | fallout.fandom.com(f,SUP,h,58112)  2014ms
+Fallout: New Vegas                         | Fallout: New Vegas           | fallout.fandom.com(f,SUP,m,58112)  505ms
+Pokemon Scarlet and Violet                 | Pokémon Scarlet and Violet   | pokemon.fandom.com(f,SUP,h,38446)  pokemon-scarlet-and-violet.fandom.com(f,m,15)  2060ms
+Animal Crossing: New Horizons              | Animal Crossing: New Horizon | nookipedia.com(i,m,20162)  animalcrossing.fandom.com(f,SUP,h,4868)  1865ms
+Genshin Impact                             | Genshin Impact               | genshin-impact.fandom.com(f,h,42021)  3040ms
+Honkai: Star Rail                          | Honkai: Star Rail            | honkai-star-rail.fandom.com(f,h,17250)  honkai.fandom.com(f,m,8058)  1901ms
+Deep Rock Galactic                         | Deep Rock Galactic           | deeprockgalactic.wiki.gg(w,h,498)  deeprockgalactic.fandom.com(f,SUP,m,475)  1143ms
+Risk of Rain 2                             | Risk of Rain 2               | riskofrain2.wiki.gg(w,h,745)  riskofrain.wiki.gg(w,h,254)  1293ms
+The Binding of Isaac: Rebirth              | The Binding of Isaac: Rebirt | bindingofisaacrebirth.wiki.gg(w,h,1775)  the-boi-rebirth.fandom.com(f,h,209)  1305ms
+Slay the Spire                             | Slay the Spire               | slaythespire.wiki.gg(w,h,2241)  slay-the-spire.fandom.com(f,SUP,h,751)  1412ms
+Celeste                                    | Celeste                      | celeste.ink(i,h,485)  celestegame.fandom.com(f,SUP,h,126)  1857ms
+Undertale                                  | Undertale                    | undertale.wiki(i,h,491)  undertale.fandom.com(f,SUP,h,329)  2483ms
+Dead Cells                                 | Dead Cells                   | deadcells.wiki.gg(w,h,571)  deadcells.fandom.com(f,SUP,m,498)  1581ms
+Grounded                                   | Grounded                     | grounded.wiki.gg(w,h,1723)  grounded.fandom.com(f,SUP,m,1311)  1279ms
+Palworld                                   | Palworld                     | palworld.wiki.gg(w,h,3354)  palworld.fandom.com(f,SUP,h,1897)  1196ms
+Lethal Company                             | Lethal Company               | lethal.miraheze.org(m,h,810)  lethalcompany.wiki.gg(w,m,20)  1281ms
+Balatro                                    | Balatro                      | balatrowiki.org(i,h,517)  balatrogame.fandom.com(f,SUP,h,243)  2115ms
+Helldivers 2                               | Helldivers 2                 | helldivers.wiki.gg(w,m,2372)  helldivers.fandom.com(f,SUP,h,1000)  1318ms
+Monster Hunter Wilds                       | Monster Hunter Wilds         | monsterhunter.fandom.com(f,m,38115)  1402ms
+Blox Fruits                                | Blox Fruits                  | blox-fruits.fandom.com(f,m,1519)  713ms
+Adopt Me!                                  | Adopt Me!                    | adoptme.fandom.com(f,h,4325)  1268ms
+Arknights                                  | Arknights                    | arknights.wiki.gg(w,h,17586)  arknights.fandom.com(f,SUP,m,10550)  1397ms
+Final Fantasy XIV                          | Final Fantasy XIV            | ffxiv.consolegameswiki.com(i,m,101021)  final-fantasy.fandom.com(f,m,56690)  2376ms
+World of Warcraft                          | World of Warcraft            | warcraft.wiki.gg(w,h,349805)  world-of-warcraft.fandom.com(f,m,450)  1539ms
+Ark: Survival Evolved                      | Ark: Survival Evolved        | ark.wiki.gg(w,h,11789)  ark-survival-evolved.fandom.com(f,SUP,m,10653)  1933ms
+The Powder Toy                             | The Powder Toy               | powdertoy.co.uk(i,m,420)  1726ms
+Cookie Clicker                             | Cookie Clicker               | cookieclicker.wiki.gg(w,h,120)  cookieclicker.fandom.com(f,SUP,h,103)  1354ms

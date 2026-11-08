@@ -26,7 +26,7 @@ async function spaceHost(host: string) {
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
 }
 
-export async function httpGet(url: string, ttlSeconds = 600): Promise<HttpResult> {
+export async function httpGet(url: string, ttlSeconds = 600, timeoutMs = TIMEOUT_MS): Promise<HttpResult> {
   const hit = cache.get(url);
   if (hit && Date.now() - hit.at < hit.ttl * 1000) {
     cache.delete(url); // refresh LRU position
@@ -36,7 +36,7 @@ export async function httpGet(url: string, ttlSeconds = 600): Promise<HttpResult
   const host = new URL(url).host;
   await spaceHost(host);
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetch(url, {

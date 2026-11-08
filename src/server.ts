@@ -23,14 +23,20 @@ async function resolveCached(game: string, lang: string) {
 async function pickSite(game?: string, wiki?: string, lang = "en"): Promise<{ site: WikiSite; note?: string } | { error: string }> {
   if (wiki) {
     const s = await siteFromUrl(wiki);
+    if (s && "optOut" in s) return { error: `${s.optOut} doesn't allow automated/AI access in its robots.txt, so this tool doesn't read it. Send the user there directly.` };
     return s ? { site: s } : { error: `Could not find a MediaWiki API at "${wiki}".` };
   }
   if (!game) return { error: "Give either `game` or `wiki`." };
   const r = await resolveCached(game, lang);
   const best = r.wikis[0];
-  if (!best) return { error: `No wiki found for "${game}". Try find_game_wiki with another spelling, or pass a wiki URL.` };
+  const blocked = r.unreachable.map((u) => `${u.name} (${u.url}) ${u.reason}`).join("; ");
+  if (!best) return { error: `No readable wiki found for "${game}".${blocked ? ` Known but not readable: ${blocked}.` : ""} Try find_game_wiki with another spelling, or pass a wiki URL.` };
   const alt = r.wikis.slice(1, 3).map((w) => new URL(w.api).host).join(", ");
-  return { site: best, note: `Using ${best.name} (${new URL(best.api).host}) for "${r.game?.label ?? game}"${alt ? `; others: ${alt}` : ""}.` };
+  let note = `Using ${best.name} (${new URL(best.api).host}) for "${r.game?.label ?? game}"${alt ? `; others: ${alt}` : ""}.`;
+  if (best.franchise) note += ` This is a series-wide wiki; make sure pages are about ${r.game?.label ?? game}.`;
+  if (best.pageHint) note += ` The game's own page there is "${best.pageHint}".`;
+  if (blocked) note += ` Note: ${blocked}; the wiki used here may be less current, so tell the user where the main wiki is.`;
+  return { site: best, note };
 }
 
 /** Wiki text is written by strangers: frame it as data with a per-response random delimiter. */
@@ -83,11 +89,13 @@ export function createServer() {
       if (r.wikis.length === 0) out.push("No wiki found.");
       r.wikis.forEach((w, i) => {
         out.push(
-          `${i + 1}. ${w.name} — ${new URL(w.api).origin}  [${w.host}${w.official ? ", official" : ""}${w.superseded ? ", SUPERSEDED" : ""}; confidence ${w.confidence}; ${w.articles} articles; last human edit ${w.lastEdit?.slice(0, 10) ?? "unknown"}]` +
+          `${i + 1}. ${w.name} — ${new URL(w.api).origin}  [${w.host}${w.official ? ", official" : ""}${w.franchise ? ", series-wide" : ""}${w.superseded ? ", SUPERSEDED" : ""}; confidence ${w.confidence}; ${w.articles} articles; last human edit ${w.lastEdit?.slice(0, 10) ?? "unknown"}]` +
+            (w.pageHint ? `\n   Page for this game: "${w.pageHint}"` : "") +
             (w.notes.length ? `\n   ${w.notes.join("; ")}` : ""),
         );
       });
-      if (r.pcgamingwiki) out.push(`PCGamingWiki (PC settings, fixes, performance): https://www.pcgamingwiki.com/wiki/${encodeURIComponent(r.pcgamingwiki)} — pass wiki="pcgamingwiki.com" to search it.`);
+      for (const u of r.unreachable) out.push(`Not readable by this tool: ${u.name} — ${u.url} (${u.reason}). If it's the main wiki, point the user to it.`);
+      if (r.pcgamingwiki) out.push(`PCGamingWiki (PC settings, fixes, performance): https://www.pcgamingwiki.com/wiki/${encodeURIComponent(r.pcgamingwiki)} (link for the user; its robots.txt disallows API access).`);
       const facts = r.game ? factsFor(r.game.label).concat(factsFor(game)) : factsFor(game);
       if (facts.length) out.push(`Verified facts exist for this game: call get_verified_facts.`);
       return text(out.join("\n"));
