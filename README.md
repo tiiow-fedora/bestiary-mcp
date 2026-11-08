@@ -25,6 +25,10 @@ while it went stale. The resolver combines:
 2. **[Indie Wiki Buddy](https://github.com/KevinPayravi/indie-wiki-buddy)** data (MIT) for where each
    Fandom community moved. The old copy is marked `SUPERSEDED`.
 3. **Probing** `{slug}.wiki.gg` / `{slug}.fandom.com`, accepted only if the wiki's own name matches.
+4. **Steam app ID** (optional `steam_appid` on every tool): an exact Wikidata match, so niche or ambiguous names
+   ("Data Center") resolve to the right game.
+5. **[PCGamingWiki](https://www.pcgamingwiki.com)** is always listed last for PC games (settings, fixes, save
+   locations). When no gameplay wiki exists, which is common for small indie games, it's the one used.
 
 It then ranks by trust, freshness (last human edit), size, and whether the wiki covers one game or a whole series.
 In a 53-game test it picked the right wiki for every one, including Minecraft → minecraft.wiki,
@@ -46,7 +50,7 @@ OSRS → oldschool.runescape.wiki, Zelda TotK → zeldawiki.wiki, and Skyrim →
 ```bash
 npm install
 npm run build
-claude mcp add bestiary-mcp --scope user -- node /path/to/bestiary-mcp/dist/stdio.js
+claude mcp add bestiary --scope user -- node /path/to/bestiary-mcp/dist/stdio.js
 ```
 
 Any MCP client works the same way: run `node dist/stdio.js` over stdio.
