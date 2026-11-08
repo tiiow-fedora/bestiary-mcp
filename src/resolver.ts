@@ -364,7 +364,8 @@ export async function resolveGame(query: string, lang = "en", steamAppId?: numbe
   // Name sanity check for weak sources; drop clear mismatches and fan-fiction wikis.
   const fanQuery = /fanon|fan ?fic|creepypasta|roleplay|ideas/i.test(query);
   for (const [key, c] of cands) {
-    if (!fanQuery && /fanon|fan ?fic|creepypasta|role ?play|ideas wiki|fan ?made/i.test(c.name)) { cands.delete(key); continue; }
+    // Check the host too: fan-fiction wikis often call themselves after the real setting (warhammer40kfanon = "Warhammer 40,000 Wiki").
+    if (!fanQuery && (/fanon|fan ?fic|creepypasta|role ?play|ideas wiki|fan ?made/i.test(c.name) || /fanon|fanfic|creepypasta|roleplay/i.test(new URL(c.api).host))) { cands.delete(key); continue; }
     const m = Math.max(...names.map((n) => nameMatch(n, c.name)));
     if (c.confidence === "low") {
       if (m < 0.5) cands.delete(key);
